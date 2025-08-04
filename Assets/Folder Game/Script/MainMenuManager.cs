@@ -19,23 +19,7 @@ public class MainMenuManager : MonoBehaviour
     void Start()
     {
         // Setup button listeners
-        if (playButton != null)
-        {
-            playButton.onClick.AddListener(PlayGame);
-        }
-        else
-        {
-            Debug.LogError("MainMenuManager: Play button not assigned!");
-        }
-        
-        if (exitButton != null)
-        {
-            exitButton.onClick.AddListener(ExitGame);
-        }
-        else
-        {
-            Debug.LogError("MainMenuManager: Exit button not assigned!");
-        }
+        SetupButtons();
         
         // Setup audio
         if (audioSource == null)
@@ -54,6 +38,35 @@ public class MainMenuManager : MonoBehaviour
         // Set cursor to be visible and unlocked
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+    }
+    
+    void SetupButtons()
+    {
+        if (playButton != null)
+        {
+            playButton.onClick.RemoveAllListeners();
+            playButton.onClick.AddListener(PlayGame);
+        }
+        else
+        {
+            Debug.LogError("MainMenuManager: Play button not assigned!");
+        }
+        
+        if (exitButton != null)
+        {
+            exitButton.onClick.RemoveAllListeners();
+            exitButton.onClick.AddListener(ExitGame);
+        }
+        else
+        {
+            Debug.LogError("MainMenuManager: Exit button not assigned!");
+        }
+    }
+    
+    // Call this method when buttons are reassigned
+    public void RefreshButtonAssignments()
+    {
+        SetupButtons();
     }
     
     public void PlayGame()

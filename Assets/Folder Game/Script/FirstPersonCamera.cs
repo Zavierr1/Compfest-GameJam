@@ -113,6 +113,12 @@ public class FirstPersonCamera : MonoBehaviour
     
     void HandleCursorLock()
     {
+        // Don't handle cursor lock if pause menu is active
+        if (PauseMenuManager.Instance != null && PauseMenuManager.Instance.IsPaused)
+        {
+            return;
+        }
+        
         // ESC to unlock cursor
         if (Input.GetKeyDown(KeyCode.Escape))
         {

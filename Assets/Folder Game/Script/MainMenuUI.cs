@@ -21,39 +21,69 @@ public class MainMenuUI : MonoBehaviour
     
     void Start()
     {
-        // Ensure we don't create UI multiple times
+        // Ensure cursor is visible and unlocked for main menu
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        
+        // Add small delay to ensure scene is fully loaded
+        StartCoroutine(CreateUIAfterDelay());
+    }
+    
+    System.Collections.IEnumerator CreateUIAfterDelay()
+    {
+        // Wait a frame to ensure everything is loaded
+        yield return new WaitForEndOfFrame();
+        
         if (!uiCreated)
         {
             CreateMainMenuUI();
             uiCreated = true;
         }
+        
+        // Additional safety check - ensure UI stays visible
+        StartCoroutine(EnsureUIStaysVisible());
+    }
+    
+    System.Collections.IEnumerator EnsureUIStaysVisible()
+    {
+        // Wait a bit longer, then check if UI is still there
+        yield return new WaitForSeconds(0.5f);
+        
+        if (canvas != null && canvas.gameObject != null)
+        {
+            canvas.gameObject.SetActive(true);
+            canvas.enabled = true;
+        }
+        
+        // Ensure cursor remains visible and unlocked in main menu
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
     
     void CreateMainMenuUI()
     {
-        // Get or create canvas - prioritize existing one
-        canvas = FindFirstObjectByType<Canvas>();
-        if (canvas == null)
+        // Destroy any existing MainMenuCanvas to prevent conflicts
+        GameObject[] existingCanvases = GameObject.FindGameObjectsWithTag("Untagged");
+        foreach (GameObject go in existingCanvases)
         {
-            GameObject canvasGO = new GameObject("MainMenuCanvas");
-            canvas = canvasGO.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 100; // Higher than game UI
-            
-            CanvasScaler scaler = canvasGO.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            
-            canvasGO.AddComponent<GraphicRaycaster>();
+            if (go.name == "MainMenuCanvas" && go != gameObject)
+            {
+                DestroyImmediate(go);
+            }
         }
         
-        // Clear existing menu content to avoid duplicates
-        Transform existingMenu = canvas.transform.Find("MenuContainer");
-        if (existingMenu != null)
-        {
-            DestroyImmediate(existingMenu.gameObject);
-        }
+        // Create fresh canvas for main menu
+        GameObject canvasGO = new GameObject("MainMenuCanvas");
+        canvas = canvasGO.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 1000; // Very high priority to ensure it's on top
+        
+        CanvasScaler scaler = canvasGO.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        
+        canvasGO.AddComponent<GraphicRaycaster>();
         
         // Create background overlay like pause menu
         CreateBackground();
@@ -86,11 +116,26 @@ public class MainMenuUI : MonoBehaviour
             Button[] buttons = menuContainer.GetComponentsInChildren<Button>();
             foreach (Button btn in buttons)
             {
-                if (btn.name == "PlayButton" && menuManager.playButton == null)
+                if (btn.name == "PlayButton")
                     menuManager.playButton = btn;
-                else if (btn.name == "ExitButton" && menuManager.exitButton == null)
+                else if (btn.name == "ExitButton")
                     menuManager.exitButton = btn;
             }
+            
+            // Refresh button assignments to ensure listeners are properly set
+            menuManager.RefreshButtonAssignments();
+        }
+        
+        // Mark UI as created
+        uiCreated = true;
+    }
+    
+    void OnDestroy()
+    {
+        // Clean up when this object is destroyed
+        if (canvas != null && canvas.gameObject != null)
+        {
+            DestroyImmediate(canvas.gameObject);
         }
     }
     

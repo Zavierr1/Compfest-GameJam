@@ -25,6 +25,10 @@ public class PauseMenuManager : MonoBehaviour
     private FirstPersonCamera firstPersonCamera;
     private float originalTimeScale;
     
+    // Store original cursor state for restoration
+    private CursorLockMode originalCursorLockState;
+    private bool originalCursorVisible;
+    
     // Singleton pattern for easy access
     public static PauseMenuManager Instance { get; private set; }
     
@@ -41,6 +45,16 @@ public class PauseMenuManager : MonoBehaviour
         }
         
         originalTimeScale = Time.timeScale;
+    }
+    
+    void OnEnable()
+    {
+        // Ensure pause menu is properly initialized when this object is enabled
+        // This helps when returning from other scenes
+        if (pauseCanvas == null)
+        {
+            Debug.Log("PauseMenuManager OnEnable: Pause canvas is null, will recreate in Start()");
+        }
     }
     
     void Start()
@@ -61,17 +75,32 @@ public class PauseMenuManager : MonoBehaviour
             }
         }
         
-        // Create pause menu if not assigned
+        // Create pause menu if not assigned or if it was destroyed
         if (pauseCanvas == null)
         {
+            Debug.Log("Creating pause menu UI in Start()...");
             CreatePauseMenuUI();
         }
         
         // Setup button listeners
         SetupButtonListeners();
         
-        // Ensure pause menu starts hidden
+        // Ensure pause menu starts hidden and game is not paused
+        isPaused = false;
+        Time.timeScale = originalTimeScale;
         SetPauseMenuActive(false);
+        
+        // Initialize cursor state for game scene
+        if (firstPersonCamera != null && firstPersonCamera.lockCursor)
+        {
+            originalCursorLockState = CursorLockMode.Locked;
+            originalCursorVisible = false;
+        }
+        else
+        {
+            originalCursorLockState = Cursor.lockState;
+            originalCursorVisible = Cursor.visible;
+        }
     }
     
     void Update()
@@ -105,8 +134,20 @@ public class PauseMenuManager : MonoBehaviour
     {
         if (isPaused) return;
         
+        // Ensure pause menu UI exists before trying to show it
+        if (pauseCanvas == null)
+        {
+            Debug.LogWarning("Pause canvas is null, recreating pause menu UI...");
+            CreatePauseMenuUI();
+            SetupButtonListeners();
+        }
+        
         isPaused = true;
         Time.timeScale = 0f;
+        
+        // Store original cursor state before changing it
+        originalCursorLockState = Cursor.lockState;
+        originalCursorVisible = Cursor.visible;
         
         // Show pause menu
         SetPauseMenuActive(true);
@@ -117,7 +158,7 @@ public class PauseMenuManager : MonoBehaviour
             DisablePlayerInput();
         }
         
-        // Enable cursor
+        // Enable cursor for menu interaction
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         
@@ -145,12 +186,9 @@ public class PauseMenuManager : MonoBehaviour
             EnablePlayerInput();
         }
         
-        // Lock cursor back
-        if (firstPersonCamera != null && firstPersonCamera.lockCursor)
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
+        // Restore original cursor state
+        Cursor.lockState = originalCursorLockState;
+        Cursor.visible = originalCursorVisible;
         
         // Play unpause sound
         PlaySound(unpauseSound);
@@ -189,12 +227,42 @@ public class PauseMenuManager : MonoBehaviour
         if (pauseCanvas != null)
         {
             pauseCanvas.gameObject.SetActive(active);
+            Debug.Log($"Pause canvas set to: {active}");
+        }
+        else
+        {
+            Debug.LogError("Pause canvas is null! Cannot show/hide pause menu.");
         }
         
         if (pausePanel != null)
         {
             pausePanel.SetActive(active);
         }
+    }
+    
+    // Public method to force recreate pause menu UI - useful for debugging
+    public void RecreatePauseMenuUI()
+    {
+        Debug.Log("Manually recreating pause menu UI...");
+        
+        // Destroy existing UI if any
+        if (pauseCanvas != null && pauseCanvas.gameObject != null)
+        {
+            DestroyImmediate(pauseCanvas.gameObject);
+        }
+        
+        // Reset references
+        pauseCanvas = null;
+        pausePanel = null;
+        continueButton = null;
+        exitButton = null;
+        
+        // Recreate UI
+        CreatePauseMenuUI();
+        SetupButtonListeners();
+        SetPauseMenuActive(false);
+        
+        Debug.Log("Pause menu UI recreated successfully!");
     }
     
     void DisablePlayerInput()
