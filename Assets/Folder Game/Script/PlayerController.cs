@@ -9,6 +9,10 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            Debug.LogError("PlayerController: Rigidbody component not found!");
+        }
     }
 
     void Update()

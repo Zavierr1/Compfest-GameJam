@@ -34,7 +34,22 @@ public class VoidAnomalu : MonoBehaviour
 
     void ChasePlayer()
     {
-        // Implement chasing logic here
+        // Find the player
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            // Chase the player
+            Vector3 direction = (player.transform.position - transform.position).normalized;
+            transform.position += direction * moveSpeed * 1.5f * Time.deltaTime; // 1.5x speed when chasing
+            
+            // Look at the player
+            transform.LookAt(player.transform);
+        }
+        else
+        {
+            Debug.LogWarning("VoidAnomalu: Player with 'Player' tag not found!");
+            isChasing = false; // Stop chasing if no player found
+        }
     }
 
     void OnTriggerEnter(Collider other)
