@@ -22,10 +22,10 @@ public class GameManager : MonoBehaviour
         UpdateUI();
     }
 
-    public void KumpulkanMemori(string namaMemori)
+public void KumpulkanMemori(FragmentType fragmentType)
     {
         memoriTerkumpul++;
-        Debug.Log($"Mengumpulkan: {namaMemori}");
+        Debug.Log($"Mengumpulkan: {fragmentType}");
         UpdateUI();
 
         if (memoriTerkumpul >= totalMemori)
