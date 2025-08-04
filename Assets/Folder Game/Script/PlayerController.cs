@@ -6,6 +6,10 @@ public class PlayerController : MonoBehaviour
     [Header("Movement Settings")]
     public float kecepatanGerak = 5f;
     
+    [Header("Gravity System")]
+    public float gravityStrength = 9.81f;
+    public float rotationSpeed = 2f; // Speed of player rotation during gravity change
+    
     [Header("Gravity Change Effects")]
     [SerializeField] private ParticleSystem gravityChangeParticles;
     [SerializeField] private AudioSource audioSource;
@@ -27,8 +31,25 @@ public class PlayerController : MonoBehaviour
     private Vector3 arahGerak;
     private Renderer playerRenderer;
     private Color originalColor;
-    private Camera playerCamera;
+    private Camera playerCamera; // Keep simple camera reference
     private Coroutine colorChangeCoroutine;
+    
+    // Gravity system variables
+    [Header("Gravity Debug Info")]
+    public int currentGravityDirection = 0; // Made public for UI access: 0=down, 1=up, 2=left, 3=right
+    private bool isRotating = false;
+    private Vector3[] gravityDirections = {
+        Vector3.down,     // 0 - Normal gravity (down)
+        Vector3.up,       // 1 - Upside down (up) 
+        Vector3.left,     // 2 - Left wall
+        Vector3.right     // 3 - Right wall
+    };
+    private Vector3[] playerRotations = {
+        Vector3.zero,           // 0 - Normal (0, 0, 0) - standing on floor
+        new Vector3(180, 0, 0), // 1 - Upside down - standing on ceiling  
+        new Vector3(0, 0, 90),  // 2 - Left wall - rotated so left becomes down
+        new Vector3(0, 0, -90)  // 3 - Right wall - rotated so right becomes down
+    };
 
     void Start()
     {
@@ -69,6 +90,15 @@ public class PlayerController : MonoBehaviour
         
         // Get camera reference for shake effect
         playerCamera = Camera.main;
+        
+        // Initialize gravity system after start
+        StartCoroutine(InitializeGravityAfterStart());
+    }
+    
+    System.Collections.IEnumerator InitializeGravityAfterStart()
+    {
+        yield return null; // Wait one frame
+        SetGravityDirection(currentGravityDirection, false); // Set initial gravity without effects
     }
 
     void Update()
@@ -78,26 +108,146 @@ public class PlayerController : MonoBehaviour
         float vertical = Input.GetAxis("Vertical");
         arahGerak = new Vector3(horizontal, 0, vertical).normalized;
 
-        // Input perubahan gravitasi
-        if (Input.GetKeyDown(KeyCode.Q)) UbahGravitasi(-90);
-        if (Input.GetKeyDown(KeyCode.E)) UbahGravitasi(90);
+        // Input perubahan gravitasi - cycle through all 6 directions with E key
+        if (Input.GetKeyDown(KeyCode.E) && !isRotating)
+        {
+            CycleGravityDirection();
+        }
     }
 
     void FixedUpdate()
     {
-        // Terapkan gerakan
-        Vector3 gerakan = transform.TransformDirection(arahGerak) * kecepatanGerak;
-        rb.linearVelocity = new Vector3(gerakan.x, rb.linearVelocity.y, gerakan.z);
+        // Get movement input in world space based on current gravity orientation
+        Vector3 worldMovement = CalculateWorldMovement(arahGerak);
+        
+        // Get current velocity and gravity
+        Vector3 currentVelocity = rb.linearVelocity;
+        Vector3 gravityDirection = Physics.gravity.normalized;
+        
+        // Separate velocity into gravity component and movement component
+        Vector3 gravityVelocity = Vector3.Project(currentVelocity, gravityDirection);
+        
+        // Apply new movement while preserving gravity velocity
+        Vector3 newVelocity = worldMovement * kecepatanGerak + gravityVelocity;
+        rb.linearVelocity = newVelocity;
+    }
+    
+    Vector3 CalculateWorldMovement(Vector3 inputDirection)
+    {
+        if (inputDirection.magnitude < 0.01f) return Vector3.zero;
+        
+        // Get the player's current orientation
+        Vector3 forward = transform.forward;
+        Vector3 right = transform.right;
+        
+        // Calculate movement in world space
+        Vector3 moveDirection = (forward * inputDirection.z + right * inputDirection.x).normalized;
+        
+        // Ensure movement is perpendicular to gravity
+        Vector3 gravityDirection = Physics.gravity.normalized;
+        moveDirection = Vector3.ProjectOnPlane(moveDirection, gravityDirection);
+        
+        return moveDirection;
+    }
+
+    void CycleGravityDirection()
+    {
+        // Move to next gravity direction
+        currentGravityDirection = (currentGravityDirection + 1) % gravityDirections.Length;
+        SetGravityDirection(currentGravityDirection, true);
+    }
+    
+    void SetGravityDirection(int directionIndex, bool playEffects)
+    {
+        if (directionIndex < 0 || directionIndex >= gravityDirections.Length)
+            return;
+            
+        // Start rotation coroutine
+        StartCoroutine(RotateToGravityDirection(directionIndex, playEffects));
+    }
+    
+    System.Collections.IEnumerator RotateToGravityDirection(int directionIndex, bool playEffects)
+    {
+        isRotating = true;
+        
+        // Get target rotation
+        Vector3 targetRotation = playerRotations[directionIndex];
+        Vector3 targetGravity = gravityDirections[directionIndex] * gravityStrength;
+        
+        // Store initial rotation
+        Vector3 initialRotation = transform.eulerAngles;
+        
+        // Normalize angles to handle 360-degree wrapping
+        initialRotation = NormalizeAngles(initialRotation);
+        targetRotation = NormalizeAngles(targetRotation);
+        
+        // Choose shortest rotation path
+        Vector3 deltaRotation = targetRotation - initialRotation;
+        deltaRotation = NormalizeAngles(deltaRotation);
+        
+        float rotationTime = 0f;
+        float totalRotationTime = 1f / rotationSpeed;
+        
+        // Play effects if requested
+        if (playEffects)
+        {
+            PlayGravityChangeEffects();
+        }
+        
+        // Smoothly rotate player and change gravity
+        while (rotationTime < totalRotationTime)
+        {
+            rotationTime += Time.deltaTime;
+            float t = rotationTime / totalRotationTime;
+            
+            // Use smooth curve for rotation
+            t = Mathf.SmoothStep(0f, 1f, t);
+            
+            // Interpolate rotation
+            Vector3 currentRotation = initialRotation + deltaRotation * t;
+            transform.eulerAngles = currentRotation;
+            
+            // Interpolate gravity
+            Vector3 currentGravity = Vector3.Lerp(Physics.gravity, targetGravity, t);
+            Physics.gravity = currentGravity;
+            
+            yield return null;
+        }
+        
+        // Ensure final values are exact
+        transform.eulerAngles = targetRotation;
+        Physics.gravity = targetGravity;
+        
+        isRotating = false;
+        
+        // Debug log the current state
+        string[] directionNames = {"Down", "Up", "Left", "Right"};
+        Debug.Log($"Gravity changed to: {directionNames[directionIndex]} | Rotation: {targetRotation} | Gravity: {targetGravity}");
+    }
+    
+    Vector3 NormalizeAngles(Vector3 angles)
+    {
+        angles.x = NormalizeAngle(angles.x);
+        angles.y = NormalizeAngle(angles.y);
+        angles.z = NormalizeAngle(angles.z);
+        return angles;
+    }
+    
+    float NormalizeAngle(float angle)
+    {
+        while (angle > 180f) angle -= 360f;
+        while (angle < -180f) angle += 360f;
+        return angle;
     }
 
     void UbahGravitasi(float sudut)
     {
-        // Rotate player and change gravity
-        transform.Rotate(Vector3.forward, sudut);
-        Physics.gravity = -transform.up * 9.81f;
-        
-        // Trigger all feedback effects
-        PlayGravityChangeEffects();
+        // Legacy method - keeping for compatibility but redirecting to new system
+        if (!isRotating)
+        {
+            if (sudut > 0)
+                CycleGravityDirection();
+        }
     }
     
     void PlayGravityChangeEffects()

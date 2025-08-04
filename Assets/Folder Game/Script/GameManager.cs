@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using TMPro;
 
 public class GameManager : MonoBehaviour
@@ -46,5 +47,24 @@ public void KumpulkanMemori(FragmentType fragmentType)
     {
         Debug.Log("Selamat! Purpose Ditemukan!");
         // Tambahkan efek menang di sini
+    }
+    
+    void Update()
+    {
+        // ESC is now handled by PauseMenuManager
+        // Remove direct ESC handling to avoid conflicts
+    }
+    
+    public void ReturnToMainMenu()
+    {
+        // Use scene transition manager if available, otherwise load directly
+        if (SceneTransitionManager.Instance != null)
+        {
+            SceneTransitionManager.Instance.LoadScene("MainMenu");
+        }
+        else
+        {
+            SceneManager.LoadScene("MainMenu");
+        }
     }
 }

@@ -6,6 +6,8 @@ TagManager:
   tags:
   - Memory
   - LightBeam
+  - HiddenPath
+  - HiddenClue
   layers:
   - Default
   - TransparentFX
